@@ -35,10 +35,9 @@
 
 (defn has-adjacent-digits-part-2?
   [n]
-  (-> (frequencies (str n))
-      vals
-      set
-      (contains? 2)))
+  (some #(= 2 (count %))
+        (partition-by identity (str n))))
+
 
 #_(solve-part-2)
 (defn solve-part-2
