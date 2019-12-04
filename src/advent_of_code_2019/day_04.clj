@@ -23,10 +23,6 @@
 (def min-n 235741)
 (def max-n 706948)
 
-; 471207
-; 471206
-; 188187 
-; 1178
 
 #_(solve-part-1)
 (defn solve-part-1
