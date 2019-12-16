@@ -394,9 +394,11 @@
       (is (= [11 1] (last order) (nth order 298))))))
 
 
+#_(solve-part-2)
 (defn solve-part-2
   []
   (let [[x y] (nth (vaporization-order (parse-input (read-input))
-                                       [26 29]))]
+                                       [26 29])
+                   199)]
     (+ y (* x 100))))
 
