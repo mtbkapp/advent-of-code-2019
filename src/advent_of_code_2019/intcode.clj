@@ -2,6 +2,11 @@
   (:require [clojure.test :refer :all]))
 
 
+(defn wrap-int-bool
+  [f]
+  (fn [x y]
+    (bool->int (f x y))))
+
 (def opcodes
   {"01" {:op + :param-count 3 :op-type :binary} 
    "02" {:op * :param-count 3 :op-type :binary}
@@ -9,8 +14,8 @@
    "04" {:op :op/output :param-count 1 :op-type :io}
    "05" {:op :op/jump-if :param-count 2 :op-type :jump}
    "06" {:op :op/jump-if-not :param-count 2 :op-type :jump}
-   "07" {:op < :param-count 3 :op-type :binary}
-   "08" {:op = :param-count 3 :op-type :binary}
+   "07" {:op (wrap-int-bool <) :param-count 3 :op-type :binary}
+   "08" {:op (wrap-int-bool =) :param-count 3 :op-type :binary}
    "09" {:op :op/rel-set :param-count 1 :op-type :relative}
    "99" {:op :op/halt :param-count 0 :op-type :halt}})
 
@@ -112,7 +117,8 @@
     (= :op/rel-set opc) [(get-param program
                                     rel-ptr
                                     (first args)
-                                    (first param-modes))]))
+                                    (first param-modes))]
+    :else []))
 
 
 (deftest test-read-params
@@ -177,6 +183,69 @@
              (read-params prg 1 (parse-op prg 0)))))))
 
 
+(defn update-instr-ptr
+  [computer delta]
+  )
+
+(defn write
+  [computer dest v]
+  ; TODO expand memory when needed
+  (update computer
+          :program 
+          assoc
+          dest
+          v))
+
+(def next-state* nil)
+(defmulti next-state*
+  (fn [computer {:keys [op-type] :as op}]
+    op-type))
+
+(defmethod next-state* :binary
+  [computer {opf :op [p0 p1 dest] :params :as op}]
+  (update
+    (write computer dest (opf p0 p1))
+    :instr-ptr
+    +
+    4))
+
+(defn int->bool
+  [x]
+  (if (zero? x) 0 1))
+
+(defn should-jump?
+  [opc jump?]
+  (if (= opc :op/jump-if)
+    (int->bool jump?)
+    (not (int->bool jump?))))
+
+(defmethod next-state* :jump
+  [computer {opc :op [jump? location] :params :as op}]
+  (if (should-jump? opc jump?) 
+    (assoc computer :instr-ptr location)
+    (update computer :instr-ptr + 3)))
+
+(defmethod next-state* :io
+  [computer {opc :op [output] :params :as op}]
+  (update
+    (if (= opc :op/input)
+      (assoc computer :state :state/need-input)
+      (assoc computer :state :state/output :output output))
+    :instr-ptr
+    +
+    2))
+
+(defmethod next-state* :relative
+  [computer {[delta] :params :as op}]
+  (-> computer
+      (update :rel-ptr + delta)
+      (update :instr-ptr + 2)))
+
+(defmethod next-state* :default
+  [computer op]
+  (assoc computer :state :state/halted))
+
+
 (defn new-computer
   [program]
   {:instr-ptr 0
@@ -184,16 +253,84 @@
    :state :state/running
    :program program})
 
-; states :state/halted, :state/running, :state/output, :state/need-input
 
-#_(next-state (new-computer [1101 1 1 0 99]))
 (defn next-state
-  [{:keys [instr-ptr rel-ptr state program] :as computer}]
-  (if (= :state/running state)
+  [{:keys [program state instr-ptr rel-ptr] :as computer}]
+  (if (= state :state/running)
     (let [op (parse-op program instr-ptr)
           params (read-params program rel-ptr op)]
-      params)
+      (next-state* computer (assoc op :params params)))
     computer))
+
+
+(defn check-state
+  [computer program state instr-ptr rel-ptr]
+  (is (= program (:program computer)))
+  (is (= state (:state computer)))
+  (is (= instr-ptr (:instr-ptr computer)))
+  (is (= rel-ptr (:rel-ptr computer))))
+
+
+(deftest test-next-state
+  (testing "binary ops"
+    (testing "plus"
+      (check-state (next-state (new-computer [1101 1 1 0 99]))
+                   [2 1 1 0 99]
+                   :state/running
+                   4
+                   0))
+    (testing "mult"
+      (check-state (next-state (new-computer [1102 3 4 0 99]))
+                   [12 3 4 0 99]   
+                   :state/running
+                   4
+                   0))
+    (testing "less than"
+      (check-state (next-state (new-computer [1107 8 9 0 99]))
+                   [1 8 9 0 99]
+                   :state/running
+                   4
+                   0)
+      (check-state (next-state (new-computer [1107 8 8 0 99]))
+                   [0 8 8 0 99]
+                   :state/running
+                   4
+                   0)
+      (check-state (next-state (new-computer [1107 9 8 0 99]))
+                   [0 9 8 0 99]
+                   :state/running
+                   4
+                   0)
+      (check-state (next-state (new-computer [1107 9 8 0 99]))
+                   [0 9 8 0 99]
+                   :state/running
+                   4
+                   0))
+    (testing "equals"
+      (check-state (next-state (new-computer [1108 8 8 0 99]))
+                   [1 8 8 0 99]
+                   :state/running
+                   4
+                   0)
+      (check-state (next-state (new-computer [1108 8 9 0 99]))
+                   [0 8 9 0 99]
+                   :state/running
+                   4
+                   0)))
+  (testing "jump ops"
+    
+    )
+  (testing "input"
+    
+    )
+  (testing "output"
+    
+    )
+  (testing "rel ptr set"
+    ; rel-ptr = param
+    ; or
+    ; rel-ptr = rel-ptr + param
+    ))
 
 
 (defn run
