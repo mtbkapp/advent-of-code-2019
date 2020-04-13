@@ -189,6 +189,16 @@
       (run)))
 
 
+(defn next-with-input
+  [{s :state location :input :as computer} value]
+  (assert (= s :state/need-input))
+  (-> computer
+      (write location value)
+      (dissoc :input)
+      (assoc :state :state/running)
+      (next-state)))
+
+
 (defn get-output
   [{:keys [state output] :as computer}]
   (assert (= state :state/output))
@@ -201,6 +211,14 @@
       (dissoc :output)
       (assoc :state :state/running)
       (run)))
+
+
+(defn next-from-output
+  [{s :state location :input :as computer}]
+  (-> computer
+      (dissoc :output)
+      (assoc :state :state/running)
+      (next-state)))
 
 
 (defn wrap-collect-output
