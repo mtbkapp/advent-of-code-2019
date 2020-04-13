@@ -11,9 +11,7 @@
 (defn delta-v
   [moon-pos neighboor-pos]
   (mapv (fn [a b]
-          (cond (< a b) 1 
-                (> a b) -1 
-                :else 0))
+          (compare b a))
         moon-pos 
         neighboor-pos))
 
@@ -151,3 +149,26 @@
       (recur (conj seen state)
              (inc ticks)
              (tick state)))))
+
+
+(defn gcd
+  [a b]
+  (if (zero? b)
+    a
+    (recur b (mod a b))))
+
+
+(defn lcm
+  ([xs] (reduce lcm xs))
+  ([a b]
+   (/ (Math/abs (* a b))
+      (gcd a b))))
+
+
+
+
+
+
+
+
+
