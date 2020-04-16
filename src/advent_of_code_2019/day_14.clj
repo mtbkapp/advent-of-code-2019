@@ -210,189 +210,11 @@
   (is (= 2 (calc-reaction-count 6 3)))
   (is (= 3 (calc-reaction-count 7 3))))
 
-
-(defn initial-state
-  [reactions]
-  {:deps {"FUEL" 1}
-   :final-deps {}
-   :reactions reactions})
-
-
-(defn next-dep
-  [state]
-  (first (:deps state)))
-
-
-(defn remove-dep 
-  [state chem-name]
-  (update state :deps dissoc chem-name))
-
-
-(defn add-deps*
-  [deps new-deps]
-  (reduce (fn [deps [chem-name amount]]
-            (update deps chem-name (fnil + 0) amount))
-          deps
-          new-deps))
-
-
-(defn add-deps 
-  [state deps]
-  (update state :deps add-deps* deps))
-
-
-(defn add-final-deps
-  [state deps]
-  (update state :final-deps add-deps* deps))
-
-
-(deftest test-state-changes
-  (let [start (initial-state (parse-reactions test-reactions-1))]
-    (is (= ["FUEL" 1] (next-dep start)))
-    (is (= {} (:deps (remove-dep start "FUEL"))))
-    (is (= {"A" 30 "B" 20} (-> (remove-dep start "FUEL")
-                               (add-deps [["A" 10]])
-                               (add-deps [["A" 20] ["B" 10]])
-                               (add-deps [["B" 10]])
-                               (add-deps [["C" 1] ["D" 3]])
-                               (remove-dep "C")
-                               (remove-dep "D")
-                               :deps)))))
-
 (defn mult-deps
   [scalar deps]
   (mapv (fn [[chem-name amount]]
           [chem-name (* scalar amount)])
         deps))
-
-
-(defn ore-deps?
-  [deps]
-  (some (fn [[chem-name amount]] (= "ORE" chem-name)) deps))
-
-
-(defn step
-  [{:keys [reactions] :as state}]
-  (let [[chem-name amount :as nd] (next-dep state)
-        {react-quantity :mult react-deps :deps} (get reactions chem-name)
-        next-state (remove-dep state chem-name)]
-    (if (ore-deps? react-deps)
-      (add-final-deps next-state [nd])
-      (add-deps next-state (mult-deps (calc-reaction-count amount react-quantity) react-deps)))))
-
-
-(defn final-step
-  [{:keys [final-deps reactions] :as state}]
-  (reduce (fn [ore-amount [chem-name amount]]
-            (let [{react-quantity :mult [[_ dep-qty]] :deps} (get reactions chem-name)]
-              (+ ore-amount (* (calc-reaction-count amount react-quantity) dep-qty))))
-          0
-          final-deps))
-
-
-(defn find-ore-amount
-  [reactions]
-  (loop [state (initial-state reactions)]
-    (if (empty? (:deps state))
-      (final-step state)
-      (recur (step state)))))
-
-
-(deftest test-find-ore-amount
-  (is (= 31 (find-ore-amount (parse-reactions test-reactions-1))))
-  (is (= 165 (find-ore-amount (parse-reactions test-reactions-2))))
-  (is (= 13312 (find-ore-amount (parse-reactions test-reactions-3))))
-  (is (= 180697 (find-ore-amount (parse-reactions test-reactions-4))))
-  #_(is (= 2210736 (find-ore-amount (parse-reactions test-reactions-5))))
-  )
-
-
-#_(-> (initial-state (parse-reactions test-reactions-2))
-      (step)
-      (step)
-      (step)
-      (step)
-      (dissoc :reactions)
-      )
-
-
-#_(reverse-reactions {"FUEL" 1} (parse-reactions test-reactions-2))
-#_(reverse-reactions {"AB" 2 "BC" 3 "CA" 4} (parse-reactions test-reactions-2))
-#_(reverse-reactions {"A" 10, "B" 23, "C" 37} (parse-reactions test-reactions-2))
-(defn reverse-reactions
-  [outs reactions]
-  (reduce (fn [chems [chem-name qty]]
-            (let [{react-qty :mult ins :deps} (get reactions chem-name)
-                  step-chems (if (ore-deps? ins)
-                               {chem-name qty}
-                               (into {} (mult-deps (calc-reaction-count qty react-qty) ins)))]
-              (merge-with + chems step-chems)))
-          {}
-          outs))
-
-
-
-
-#_(prn (reverse-reactions {"FUEL" 1} (parse-reactions test-reactions-1)))
-#_(reverse-reactions {"A" 7, "E" 1} (parse-reactions test-reactions-1))
-#_(reverse-reactions {"A" 14, "D" 1} (parse-reactions test-reactions-1))
-#_(reverse-reactions {"A" 21, "C" 1} (parse-reactions test-reactions-1))
-#_(reverse-reactions {"A" 28, "B" 1} (parse-reactions test-reactions-1))
-
-
-
-(defn convert-to-ore
-  [chems reactions]
-  (reduce (fn [ore-qty [chem-name qty]]
-            (let [{react-qty :mult [[_ dep-qty]] :deps} (get reactions chem-name)]
-              (+ ore-qty (* dep-qty (calc-reaction-count qty react-qty)))))
-          0
-          chems))
-
-(defn unreact
-  [reactions]
-  (loop [chems {"FUEL" 1}]
-    (let [next-chems (reverse-reactions chems reactions)]
-      (if (= chems next-chems)
-        (convert-to-ore chems reactions)
-        (recur next-chems)))))
-
-#_ (prn (unreact (parse-reactions test-reactions-5)))
-
-(deftest test-unreact
-  (is (= 31 (unreact (parse-reactions test-reactions-1))))
-  (is (= 165 (unreact (parse-reactions test-reactions-2))))
-  (is (= 13312 (unreact (parse-reactions test-reactions-3))))
-  (is (= 180697 (unreact (parse-reactions test-reactions-4))))
-  #_(is (= 2210736 (unreact (parse-reactions test-reactions-5))))
-  
-  )
-
-
-#_(prn (reverse-reactions {"FUEL" 1} (parse-reactions test-reactions-5)))
-#_(prn (reverse-reactions {"BHXH" 6, "KTJDG" 18, "WPTQ" 12, "PLWSL" 7, "FHTLT" 31, "ZDVW" 37} (parse-reactions test-reactions-5)))
-#_(prn (reverse-reactions {"ZLQW" 99, "BHXH" 6, "BMBT" 33, "KTJDG" 126, "MZWV" 114, "XCVML" 18, "XMNCP" 576, "LTCX" 370, "RJRHP" 119, "WPTQ" 519}
-                          (parse-reactions test-reactions-5)))
-#_(prn (reverse-reactions {"XDBXC" 5151, "LTCX" 34, "VRPVC" 431, "BHXH" 475, "KTJDG" 186, "MZWV" 288, "XCVML" 1004, "BMBT" 650}
-                          (parse-reactions test-reactions-5)))
-#_(prn (reverse-reactions {"VRPVC" 32981, "CNZTR" 69552, "BHXH" 3048, "KTJDG" 3201}
-                          (parse-reactions test-reactions-5)))
-
-
-
-
-
-
-(defn solve-part-1
-  [reactions]
-  (loop [reqs (queue ["FUEL" 1])
-         inventory {}]
-    (let [[chem-name chem-qty] (peek reqs)
-          {react-qty :mult ins :deps} (get reactions chem-name)
-          react-cnt (calc-reaction-count chem-qty react-qty)
-          step-reqs (mult-deps react-cnt ins)]
-
-      )))
 
 
 (defn next-req
@@ -496,7 +318,17 @@
       (step)
       (step)
       (step)
-      pr-state
+      (step)
+      (step)
+      (step)
+      (step)
+      (step)
+      (step)
+      (step)
+      (step)
+      (step)
+      (step)
+      (step)
       (step)
       pr-state)
 (defn step
@@ -515,7 +347,7 @@
           (let [{react-qty :mult react-reqs :deps} (get-reaction state req-chem-name)
                 react-cnt (calc-reaction-count gen-qty react-qty)
                 new-reqs (mult-deps react-cnt react-reqs)
-                extra-qty (- react-qty gen-qty)
+                extra-qty (- (* react-cnt react-qty) gen-qty)
                 inv-qty-delta (+ inv-qty-delta extra-qty)]
             (-> state
                 (update-inventory req-chem-name inv-qty-delta)
@@ -536,6 +368,14 @@
   (is (= 165 (find-ore-amount (parse-reactions test-reactions-2))))
   (is (= 13312 (find-ore-amount (parse-reactions test-reactions-3))))
   (is (= 180697 (find-ore-amount (parse-reactions test-reactions-4))))
+  (is (= 2210736 (find-ore-amount (parse-reactions test-reactions-5))))
   )
+
+; solver part 1
+#_(prn (find-ore-amount (parse-reactions input-reaction)))
+
+
+(prn (double (/ 1000000000000 (find-ore-amount (parse-reactions test-reactions-3)))))
+
 
 
