@@ -3,5 +3,6 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [aysylu/loom "1.0.2"]
-                 [com.googlecode.lanterna/lanterna "3.0.2"]]
+                 [com.googlecode.lanterna/lanterna "3.0.2"]
+                 [instaparse "1.4.10"]]
   :repl-options {:init-ns advent-of-code-2019.day-01})
