@@ -76,6 +76,7 @@
 1 VJHF, 6 MNCFX => 4 RFSQX
 176 ORE => 6 VJHF")
 
+
 (def test-reactions-5
   "171 ORE => 8 CNZTR
 7 ZLQW, 3 BMBT, 9 XCVML, 26 XMNCP, 1 WPTQ, 2 MZWV, 1 RJRHP => 4 PLWSL
@@ -94,6 +95,7 @@
 121 ORE => 7 VRPVC
 7 XCVML => 6 RJRHP
 5 BHXH, 4 VRPVC => 5 LTCX")
+
 
 (def input-reaction
   "3 DJDNR => 1 ZCMR
@@ -165,6 +167,7 @@
   (parse-reactions input-reaction))
 
 
+; only one way to generate a chemical?
 (deftest test-chem-RHS-count
   (let [get-RHS #(into [] (comp  parser-xform (map first)) (parser %))]
     (is (apply distinct? (get-RHS test-reactions-1)))
@@ -180,6 +183,7 @@
   (some (fn [[chem-name amount]] (= "ORE" chem-name)) deps))
 
 
+; when ore is an input it's only the input
 (deftest test-ore-always-alone?
   (let [get-ore-deps #(into []
                             (comp parser-xform
@@ -209,6 +213,7 @@
   (is (= 2 (calc-reaction-count 5 3)))
   (is (= 2 (calc-reaction-count 6 3)))
   (is (= 3 (calc-reaction-count 7 3))))
+
 
 (defn mult-deps
   [scalar deps]
@@ -263,12 +268,13 @@
 
 
 (defn init-state
-  [reactions]
-  (-> {:reqs clojure.lang.PersistentQueue/EMPTY
-       :inventory {}
-       :reactions reactions 
-       :ore 0}
-      (queue-req "FUEL" 1)))
+  ([reactions] (init-state reactions 1))
+  ([reactions fuel-qty]
+   (-> {:reqs clojure.lang.PersistentQueue/EMPTY
+        :inventory {}
+        :reactions reactions 
+        :ore 0}
+       (queue-req "FUEL" fuel-qty))))
 
 
 (deftest test-state-manip
@@ -356,11 +362,12 @@
 
 
 (defn find-ore-amount
-  [reactions]
-  (loop [state (init-state reactions)]
-    (if (empty-reqs? state)
-      (:ore state)
-      (recur (step state)))))
+  ([reactions] (find-ore-amount reactions 1))
+  ([reactions fuel-qty]
+   (loop [state (init-state reactions fuel-qty)]
+     (if (empty-reqs? state)
+       (:ore state)
+       (recur (step state))))))
 
 
 (deftest test-find-ore-amount
@@ -368,14 +375,35 @@
   (is (= 165 (find-ore-amount (parse-reactions test-reactions-2))))
   (is (= 13312 (find-ore-amount (parse-reactions test-reactions-3))))
   (is (= 180697 (find-ore-amount (parse-reactions test-reactions-4))))
-  (is (= 2210736 (find-ore-amount (parse-reactions test-reactions-5))))
-  )
-
-; solver part 1
-#_(prn (find-ore-amount (parse-reactions input-reaction)))
+  (is (= 2210736 (find-ore-amount (parse-reactions test-reactions-5)))))
 
 
-(prn (double (/ 1000000000000 (find-ore-amount (parse-reactions test-reactions-3)))))
+; part 2
+(def ore-inv 1000000000000)
 
-
+#_(prn (fuel-for-trillion-ore (parse-reactions input-reaction) 1000)) ; => {:max-fuel 4052920, :iters 20}
+(defn fuel-for-trillion-ore
+  "Find how much fuel can be made with 1 trillion units of ore. I previously
+  found via trial and error that 5000000 fuel required more than 1 trillion ore
+  and 4000000 required less than 1 million ore. This algorithm does a binary
+  search for the amount of fuel that 1 trillion ore will produce."
+  [reactions max-iters]
+  (loop [mx 5000000
+         fuel 4500000 
+         mn 4000000
+         n max-iters]
+    (if (< 0 n)
+      (if (= 1 (- mx mn)) 
+        {:max-fuel mn :iters (- max-iters n)} 
+        (case (compare ore-inv (find-ore-amount reactions fuel))
+          -1 (recur fuel
+                    (+ mn (quot (- fuel mn) 2))
+                    mn
+                    (dec n)) 
+          0 {:max-fuel fuel :iters (- max-iters n)}
+          1 (recur mx
+                   (- mx (quot (- mx fuel) 2))
+                   fuel
+                   (dec n))))
+      (throw (ex-info "Hit max iterations!" {:params [mx fuel mn n]})))))
 
