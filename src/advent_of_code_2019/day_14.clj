@@ -21,9 +21,9 @@
 (def parser-xform (comp (map (fn [[_ & chems]]
                                (map format-chem chems)))
                         (map (juxt last butlast))
-                        (map (fn [[[chem mult] deps]]
-                               [chem {:mult mult
-                                      :deps deps}]))))
+                        (map (fn [[[chem qty] reqs]]
+                               [chem {:qty qty
+                                      :reqs reqs}]))))
 
 
 (defn parse-reactions
@@ -159,12 +159,13 @@
 
 
 (deftest test-parser
-  (parse-reactions test-reactions-1)
-  (parse-reactions test-reactions-2)
-  (parse-reactions test-reactions-3)
-  (parse-reactions test-reactions-4)
-  (parse-reactions test-reactions-5)
-  (parse-reactions input-reaction))
+  (testing "does parsing error?"
+    (parse-reactions test-reactions-1)
+    (parse-reactions test-reactions-2)
+    (parse-reactions test-reactions-3)
+    (parse-reactions test-reactions-4)
+    (parse-reactions test-reactions-5)
+    (parse-reactions input-reaction)))
 
 
 ; only one way to generate a chemical?
@@ -178,24 +179,24 @@
     (is (apply distinct? (get-RHS input-reaction)))))
 
 
-(defn ore-deps?
-  [deps]
-  (some (fn [[chem-name amount]] (= "ORE" chem-name)) deps))
+(defn ore-reqs?
+  [reqs]
+  (some (fn [[chem-name amount]] (= "ORE" chem-name)) reqs))
 
 
 ; when ore is an input it's only the input
 (deftest test-ore-always-alone?
-  (let [get-ore-deps #(into []
+  (let [get-ore-reqs #(into []
                             (comp parser-xform
-                                  (map (comp :deps second))
-                                  (filter ore-deps?))
+                                  (map (comp :reqs second))
+                                  (filter ore-reqs?))
                             (parser %))]
-    (is (every? #(= 1 (count %)) (get-ore-deps test-reactions-1)))
-    (is (every? #(= 1 (count %)) (get-ore-deps test-reactions-2)))
-    (is (every? #(= 1 (count %)) (get-ore-deps test-reactions-3)))
-    (is (every? #(= 1 (count %)) (get-ore-deps test-reactions-4)))
-    (is (every? #(= 1 (count %)) (get-ore-deps test-reactions-5)))
-    (is (every? #(= 1 (count %)) (get-ore-deps input-reaction)))))
+    (is (every? #(= 1 (count %)) (get-ore-reqs test-reactions-1)))
+    (is (every? #(= 1 (count %)) (get-ore-reqs test-reactions-2)))
+    (is (every? #(= 1 (count %)) (get-ore-reqs test-reactions-3)))
+    (is (every? #(= 1 (count %)) (get-ore-reqs test-reactions-4)))
+    (is (every? #(= 1 (count %)) (get-ore-reqs test-reactions-5)))
+    (is (every? #(= 1 (count %)) (get-ore-reqs input-reaction)))))
 
 
 (defn calc-reaction-count
@@ -215,11 +216,11 @@
   (is (= 3 (calc-reaction-count 7 3))))
 
 
-(defn mult-deps
-  [scalar deps]
+(defn mult-reqs
+  [scalar reqs]
   (mapv (fn [[chem-name amount]]
           [chem-name (* scalar amount)])
-        deps))
+        reqs))
 
 
 (defn next-req
@@ -230,11 +231,6 @@
 (defn pop-req
   [state]
   (update state :reqs pop))
-
-
-(defn queue-req
-  [state chem-name qty]
-  (update state :reqs conj [chem-name qty]))
 
 
 (defn queue-reqs
@@ -274,7 +270,7 @@
         :inventory {}
         :reactions reactions 
         :ore 0}
-       (queue-req "FUEL" fuel-qty))))
+       (queue-reqs [["FUEL" fuel-qty]]))))
 
 
 (deftest test-state-manip
@@ -307,52 +303,27 @@
   state)
 
 
-; Step algorithm
-; pull req from queue
-; pull as much from inventory as possible 
-; find reaction to produce the rest
-; put any overage into the inventory
-; put reaction requirements into queue
-
-; special case for ore?
-
-; stop?
-
-
-#_(-> (init-state (parse-reactions test-reactions-2))
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      (step)
-      pr-state)
 (defn step
   [state]
   (let [[req-chem-name req-qty] (next-req state)]
     (if (= "ORE" req-chem-name)
+      ; ore req? -> add to total
       (-> state (add-ore req-qty) (pop-req))
       (let [inv-qty (get-inventory state req-chem-name)
             gen-qty (- req-qty inv-qty)
             inv-qty-delta (- (min req-qty inv-qty))]
         (if (<= gen-qty 0)
-          ; no reaction needed
+          ; no reaction needed to supply req
+          ; update inventory and return
           (-> state
               (update-inventory req-chem-name inv-qty-delta)
               (pop-req))
-          (let [{react-qty :mult react-reqs :deps} (get-reaction state req-chem-name)
+          ; need to find the reaction to meet the req
+          ; queue new reqs
+          ; update inventory amount for left overs
+          (let [{react-qty :qty react-reqs :reqs} (get-reaction state req-chem-name)
                 react-cnt (calc-reaction-count gen-qty react-qty)
-                new-reqs (mult-deps react-cnt react-reqs)
+                new-reqs (mult-reqs react-cnt react-reqs)
                 extra-qty (- (* react-cnt react-qty) gen-qty)
                 inv-qty-delta (+ inv-qty-delta extra-qty)]
             (-> state
