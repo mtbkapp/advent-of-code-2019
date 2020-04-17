@@ -23,7 +23,7 @@
 
 (defn update-velocities
   [moons]
-  (into #{}
+  (into #{} 
         (map (fn [m]
                (reduce update-velocity m (disj moons m))))
         moons))
@@ -46,7 +46,7 @@
 
 (defn update-positions
   [moons]
-  (into #{}
+  (into #{} 
         (map (fn [m]
                (update m :pos vec-add (:v m))))
         moons))
@@ -132,23 +132,55 @@
 
 
 
-(def input-moons #{{:pos [3 3 0] :v [0 0 0]}
-                   {:pos [4 -16 2] :v [0 0 0]}
-                   {:pos [-10 -6 5] :v [0 0 0]}
-                   {:pos [-3 0 -13] :v [0 0 0]}})
+(def input-moons #{{:id :io :pos [3 3 0] :v [0 0 0]}
+                   {:id :europa :pos [4 -16 2] :v [0 0 0]}
+                   {:id :ganymede :pos [-10 -6 5] :v [0 0 0]}
+                   {:id :callisto :pos [-3 0 -13] :v [0 0 0]}})
 
 
+(def test-moons-1 #{{:id :io :pos [-1 0 2] :v [0 0 0]}
+                    {:id :europa :pos [2 -10 -7] :v [0 0 0]}
+                    {:id :ganymede :pos [4 -8 8] :v [0 0 0]}
+                    {:id :callisto :pos [3 5 -1] :v [0 0 0]}})
 
 
-#_(time (ticks-till-repeat #{{:pos [-1 0 2] :v [0 0 0]} {:pos [2 -10 -7] :v [0 0 0]} {:pos [4 -8 8] :v [0 0 0]} {:pos [3 5 -1] :v [0 0 0]}}))
-(defn ticks-till-repeat
-  [start]
-  (loop [seen #{} ticks 0 state start]
-    (if (contains? seen state)
-      ticks
-      (recur (conj seen state)
-             (inc ticks)
-             (tick state)))))
+(def test-moons-2 #{{:id :io :pos [-8 -10 0] :v [0 0 0]}
+                    {:id :europa :pos [5 5 10] :v [0 0 0]}
+                    {:id :ganymede :pos [2 -7 3] :v [0 0 0]}
+                    {:id :callisto :pos [9 -8 -3] :v [0 0 0]}})
+
+
+; part 1 solution
+#_(prn (total-energy (last (tick-n input-moons 1000))))
+
+
+; part 2, repeated state?
+
+; hints from reddit
+; 1. step function is "not surjective" which somehow implies that the first 
+;    repeated state is the initial state.
+; 2. each dimension can be calculated independently
+
+
+(def dim-fns
+  {:x first
+   :y second
+   :z #(nth % 2)})
+
+
+(defn get-moon-dim
+  [{:keys [pos v] :as moon} dim]
+  (let [f (get dim-fns dim)]
+    {:pos (f pos) :v (f v)}))
+
+
+#_(get-dim (tick test-moons-1) :z)
+(defn get-dim
+  [moons dim]
+  (reduce (fn [r {:keys [id] :as m}]
+            (assoc r id (get-moon-dim m dim)))
+          {}
+          moons))
 
 
 (defn gcd
@@ -161,14 +193,26 @@
 (defn lcm
   ([xs] (reduce lcm xs))
   ([a b]
-   (/ (Math/abs (* a b))
-      (gcd a b))))
+   (* a (/ b (gcd a b)))))
 
 
-
-
-
-
-
-
-
+#_(prn (find-repeat-from-initial test-moons-1))
+#_(prn (find-repeat-from-initial test-moons-2))
+#_(prn (find-repeat-from-initial input-moons))
+(defn find-repeat-from-initial 
+  [start-moons]
+  (let [ix (get-dim start-moons :x)
+        iy (get-dim start-moons :y) 
+        iz (get-dim start-moons :z)]
+    (loop [i 0 
+           rx 0 
+           ry 0 
+           rz 0 
+           moons start-moons]
+      (if (and (pos? rx) (pos? ry) (pos? rz))
+        (lcm [rx ry rz])
+        (recur (inc i)
+               (if (or (pos? rx) (not= ix (get-dim moons :x))) rx i)
+               (if (or (pos? ry) (not= iy (get-dim moons :y))) ry i)
+               (if (or (pos? rz) (not= iz (get-dim moons :z))) rz i)
+               (tick moons))))))
