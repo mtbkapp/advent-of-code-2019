@@ -7,7 +7,7 @@
   (insta/parser "<REACT_LIST> = REACT | REACT <'\n'> REACT_LIST
                 REACT = CHEM_LIST <SPACE> <'=>'> <SPACE> CHEM 
                 <CHEM_LIST> = CHEM | CHEM <','> <SPACE> CHEM_LIST 
-                CHEM = QUANTITY <' '+> NAME 
+                CHEM = QUANTITY <SPACE> NAME 
                 NAME = #'[A-Z]+'
                 QUANTITY = #'[1-9][0-9]*'
                 SPACE = ' '+"))
@@ -277,7 +277,7 @@
   (testing "reqs queue"
     (let [s0 (init-state {})
           r0 (next-req s0)
-          s1 (queue-req s0 "A" 3)
+          s1 (queue-reqs s0 [["A" 3]])
           r1 (next-req s1)
           r2 (-> s1 (pop-req) (next-req))
           r3 (-> s1 (pop-req) (pop-req) (next-req))]
@@ -295,12 +295,6 @@
       (is (zero? i0))
       (is (= 2 i1))
       (is (= 1 i2)))))
-
-
-(defn pr-state
-  [state]
-  (clojure.pprint/pprint (update state :reqs seq))
-  state)
 
 
 (defn step
