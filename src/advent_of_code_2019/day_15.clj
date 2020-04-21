@@ -58,6 +58,14 @@
      :depth (inc depth)}))
 
 
+(defn update-qs
+  [qs moveable state pos]
+  (-> qs
+      (update :q pop)
+      (update :q into (map #(next-state state %) moveable))
+      (update :visited conj pos)))
+
+
 (defn step
   [{:keys [q visited] :as qs}]
   (if-let [{:keys [computer pos] :as state} (peek q)]
@@ -70,22 +78,93 @@
           ; found the o2 tank!
           {:done? true :result (next-state state dest-dir)}
           ; queue places we can move
-          (-> qs
-              (update :q pop)
-              (update :q into (map #(next-state state %) moveable))
-              (update :visited conj pos)))))
+          (update-qs qs moveable state pos))))
     ; empty queue before o2 tank found :[
     {:done? true :result :empty-queue}))
 
 
-#_(find-min-moves) ; 262
+(defn iterate-until-done
+  [step-fn init]
+  (->> (iterate step-fn init)
+       (drop-while (comp not :done?))
+       (first)))
+
+
+#_(find-min-moves) ; 262, [12 -14]
 (defn find-min-moves
   []
-  (first
-    (drop-while (comp not :done?)
-                (iterate step
-                         {:q (into clojure.lang.PersistentQueue/EMPTY [init-state])
-                          :visited #{}}))))
+  (-> (iterate-until-done step
+                          {:q (into clojure.lang.PersistentQueue/EMPTY [init-state])
+                           :visited #{}})))
 
 
+(defn map-step
+  [{:keys [q visited] :as qs}]
+  (if-let [{:keys [computer pos] :as state} (peek q)]
+    (if (contains? visited pos)
+      (update qs :q pop)
+      (let [{moveable move [dest-dir] dest} (survey computer)
+            dirs (if (some? dest-dir) (conj moveable dest-dir) moveable)]
+        (update-qs qs dirs state pos)))
+    {:done? true :result visited}))
+
+
+#_(map-space)
+(defn map-space
+  []
+  (-> (iterate-until-done map-step {:q (into clojure.lang.PersistentQueue/EMPTY [init-state])
+                                    :visited #{}})
+      :result))
+
+
+(defn find-bounds
+  [visited]
+  (reduce (fn [[min-x min-y max-x max-y] [x y]]
+            [(min min-x x)
+             (min min-y y)
+             (max max-x x)
+             (max max-y y)])
+          [Long/MAX_VALUE Long/MAX_VALUE Long/MIN_VALUE Long/MIN_VALUE]
+          visited))
+
+
+#_(spit "day15_maze.txt" (with-out-str (plot-visited (map-space) [0 0] [12 -14])))
+(defn plot-visited
+  [visited start end]
+  (let [[min-x min-y max-x max-y] (find-bounds visited)]
+    (doseq [y (range min-y (inc max-y))]
+      (doseq [x (range min-x (inc max-x))]
+        (let [p [x y]]
+          (print (cond (= p start) "S"
+                       (= p end) "E"
+                       (contains? visited p) " "
+                       :else "*"))))
+      (println))))
+
+
+(defn spread-from
+  [visited p]
+  (sequence (comp (map dir->unit-vec)
+                  (map (partial vec+ p))
+                  (filter visited))
+            [north south east west]))
+
+
+(defn spread-step
+  [{:keys [air visited steps] :as state}]
+  (if (= air visited)
+    (assoc state :done? true) 
+    (-> state
+        (update :steps inc)
+        (update :air #(into air (mapcat (partial spread-from visited)) %)))))
+
+
+#_(steps-to-spread) ; 314
+(defn steps-to-spread
+  []
+  (-> (iterate-until-done spread-step {:done? false
+                                       :visited (map-space) 
+                                       :steps 0
+                                       :air #{[12 -14]}})
+      :steps))
 
