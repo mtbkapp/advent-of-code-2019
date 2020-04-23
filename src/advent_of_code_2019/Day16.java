@@ -35,20 +35,30 @@ public class Day16 {
     }
   }
 
+  private long multAdd(long[] a, long[] b) {
+    long out = 0;
+    for(int i = 0; i < a.length; i++) {
+      out += (a[i] * b[i]);
+    }
+
+    return Math.abs(out) % 10;
+  }
+
   private long[] phase(long[] input) {
     long[] output = new long[input.length];
 
     for(int i = 0; i < input.length; i++) {
       long[] repeatingSeq = (new RepeatingSeq(i)).take(input.length);
+      output[i] = multAdd(repeatingSeq, input);
     }
 
     return output;
   } 
 
   public void go() {
-    RepeatingSeq s = new RepeatingSeq(2);
-    for (int i = 0; i < 10; i++) {
-      System.out.println(s.next());
+    long[] s = phase(parseInput("12345678")); 
+    for (int i = 0; i < s.length; i++) {
+      System.out.println(s[i]);
     }
   }
 
