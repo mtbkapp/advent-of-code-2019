@@ -5,4 +5,5 @@
                  [aysylu/loom "1.0.2"]
                  [com.googlecode.lanterna/lanterna "3.0.2"]
                  [instaparse "1.4.10"]]
+  :java-source-paths ["src"]
   :repl-options {:init-ns advent-of-code-2019.day-01})
