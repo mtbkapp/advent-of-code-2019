@@ -133,7 +133,7 @@
   [ps [pos heading] program]
   (let [[next-pos pos-type turn next-heading] (find-corner-from ps [pos heading])]
     (if (= pos-type :pos/end)
-      (conj program (dist pos next-pos))
+      (rest (conj program (dist pos next-pos)))
       (recur ps [next-pos next-heading] (into program [(dist pos next-pos) turn])))))
 
 (def turn->ascii
@@ -143,13 +143,121 @@
 (defn post-process
   [program]
   (into [] 
-        (comp (remove #(and (number? %) (zero? %)))
-              (interpose \,)
+        (comp (interpose \,)
               (mapcat (fn [x]
-                     (cond (contains? turn->ascii x) [(turn->ascii x)]
-                           (number? x) (seq (str x)) 
-                           :else [x]))))
+                        (cond (contains? turn->ascii x) [(turn->ascii x)]
+                              (number? x) (seq (str x)) 
+                              :else [x]))))
         program))
+
+#_(clojure.pprint/pprint (sub-str-table "aaabbbaaaaaabbbbbb"))
+(defn sub-str-table
+  [xs]
+  (let [len (count xs)
+        table (atom {})]
+    (doseq [i (range 1 (inc len))]
+      (doseq [j (range i (inc len))]
+        (let [prev-len (get @table [(dec i) (dec j)] 0)]
+          (if (and (= (nth xs (dec i))
+                      (nth xs (dec j)))
+                   (< prev-len (- j i)))
+            (swap! table assoc [i j] (inc prev-len))))))
+    @table))
+
+#_(clojure.pprint/pprint (sort-by (comp - val) (sub-str-table needed-prg)))
+(defn get-sub-strs
+  [xs min-len]
+  (into #{}
+        (comp (filter #(<= min-len (val %)))
+              (map (fn [[[i j] len]]
+                     (take len (drop (- len i) xs)))))
+        (sub-str-table xs)))
+
+; [[26 68] 14]
+(def needed-prg
+  [:turn/left
+   10
+   :turn/right
+   12
+   :turn/right
+   12
+   :turn/right
+   6
+   :turn/right
+   10
+   :turn/left
+   10
+   :turn/left
+   10
+   :turn/right
+   12
+   :turn/right
+   12
+   :turn/right
+   10
+   :turn/left
+   10
+   :turn/left
+   12
+   :turn/right
+   6
+   :turn/right
+   6
+   :turn/right
+   10
+   :turn/left
+   10
+   :turn/right
+   10
+   :turn/left
+   10
+   :turn/left
+   12
+   :turn/right
+   6
+   :turn/right
+   6
+   :turn/right
+   10
+   :turn/left
+   10
+   :turn/right
+   10
+   :turn/left
+   10
+   :turn/left
+   12
+   :turn/right
+   6
+   :turn/left
+   10
+   :turn/right
+   12
+   :turn/right
+   12
+   :turn/right
+   10
+   :turn/left
+   10
+   :turn/left
+   12
+   :turn/right
+   6])
+
+(test-prg {:main [:A]
+           :A needed-prg
+           :B []
+           :C []
+           })
+
+(defn test-prg
+  [{:keys [main A B C] :as prg}]
+  (assert (every? #{:A :B :C} main))
+  (assert (every? #(or (number? %) (contains? #{:turn/right :turn/left} %)) A))
+  (assert (every? #(or (number? %) (contains? #{:turn/right :turn/left} %)) B))
+  (assert (every? #(or (number? %) (contains? #{:turn/right :turn/left} %)) C))
+  (= needed-prg (mapcat prg main)))
+
 
 
 (comment
@@ -158,7 +266,17 @@
   26 16
 
   (find-corner-from ps [[26 16] :heading/north])
-  (clojure.pprint/pprint (post-process (find-path ps [[26 16] :heading/north] [])))
-  
+  (with-open [wr (io/writer "day_17_prg.edn")]
+    (clojure.pprint/pprint (vec (find-path ps [[26 16] :heading/north] [])) wr))
+
+  (count (post-process (find-path ps [[26 16] :heading/north] [])))
+
+  (get-sub-strs "aaabbbaaaaaabbbbbb" 2)
+
+  (->> (sub-str-table "aaabbbaaaaaabbbbbb")
+       (filter #(< 3 (val %)))
+       (map (fn [[[i j] len]]
+              [(get-sub "aaabbbaaaaaabbbbbb" i len)
+               (get-sub "aaabbbaaaaaabbbbbb" j len)])))
 
   )
