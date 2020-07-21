@@ -17,188 +17,129 @@
 ########################")
 
 
-(defn parse-block
-  [c]
-  (cond (= \# c) :wall
-        (= \@ c) :start
-        (= \. c) :space
-        (Character/isLowerCase c) (keyword "key" (str c))
-        (Character/isUpperCase c) (keyword "door" (string/lower-case (str c)))
-        :else (throw (ex-info "Unexpected input" {:char c}))))
+(def ex3 "########################
+#...............b.C.D.f#
+#.######################
+#.....@.a.B.c.d.A.e.F.g#
+########################")
+
+
+(def ex4 "#################
+#i.G..c...e..H.p#
+########.########
+#j.A..b...f..D.o#
+########@########
+#k.E..a...g..B.n#
+########.########
+#l.F..d...h..C.m#
+#################")
+
+
+(defn read-cell
+  [cell]
+  (cond (= cell \#) :wall
+        (= cell \.) :space
+        (= cell \@) :start
+        (Character/isLowerCase cell) (keyword "key" (str cell))
+        (Character/isUpperCase cell) (keyword "door" (string/lower-case (str cell)))
+        :else (throw (IllegalStateException. (str "Invalid cell: " cell)))))
 
 
 (defn find-start
-  ([input] (find-start input 0 0))
-  ([{:keys [m width height] :as input} x y]
-   (cond (= height y) nil
-         (= width x) (recur input 0 (inc y))
-         (= :start (get-in m [y x])) [x y]
-         :else (recur input (inc x) y))))
+  [maze w h]
+  (->> (for [y (range h)
+             x (range w)]
+         [x y])
+       (drop-while (fn [[x y]]
+                     (not= :start (get-in maze [y x]))))
+       (first)))
 
 
-(defn assoc-m
-  "Update the cell at [x y] with c in input."
-  [input [x y] c]
-  (assoc-in input [:m y x] c))
-
-
-(defn add-start
-  [input]
-  (let [start (find-start input)]
-    (-> (assoc input :start start)
-        (assoc-m start :space))))
-
-
-(defn index-doors
-  [{:keys [m width height] :as input}]
-  (assoc input
-         :doors
-         (into {}
-               (for [y (range height)
-                     x (range width)
-                     :let [c (get-in m [y x])]
-                     :when (= "door" (namespace c))]
-                 [c [x y]]))))
+(defn init
+  [maze]
+  (let [h (count maze)
+        w (count (first maze))]
+    {:maze maze
+     :size [w h]
+     :start (find-start maze w h)}))
 
 
 (defn read-input
   ([] (read-input (slurp (io/resource "day_18.txt"))))
   ([input]
-   (let [m (mapv (partial mapv parse-block) (string/split-lines input))]
-     (-> {:m m
-          :width (count (first m))
-          :height (count m)}
-         (add-start)
-         (index-doors)))))
+   (init (mapv (partial mapv read-cell) (string/split-lines input)))))
 
 
-(deftest test-read-input
-  (let [{:keys [m width height start doors] :as input} (read-input ex1)]
-    (is (= #{:m :width :height :start :doors} (set (keys input))))
-    (is (= [5 1] start))
-    (is (= 9 width))
-    (is (= 3 height))
-    (is (= {:door/a [3 1]} doors))
-    (is (vector? m))
-    (is (every? vector? m))
-    (is (= (repeat 9 :wall) (first m)))
-    (is (= (repeat 9 :wall) (last m)))
-    (is (= [:wall :key/b :space :door/a :space :space :space :key/a :wall]
-           (second m))))
-  (let [{:keys [m width height start doors] :as input} (read-input)]
-    (is (= [40 40] start))
-    (is (= 81 width height))
-    (is (map? doors))
-    (is (not (contains? (into #{} (mapcat identity) m) :start)))))
+(defn ns?
+  [kw n]
+  (and (keyword? kw) (= n (namespace kw))))
+
+(defn key?
+  [kw]
+  (ns? kw "key"))
+
+(defn door?
+  [kw]
+  (ns? kw "door"))
+
+
+(deftest test-key?-and-door?
+  (is (key? :key/a))
+  (is (not (key? :door/a)))
+  (is (not (key? :start)))
+  (is (not (key? nil))))
 
 
 (defn key->door
-  "Given a key keyword returns it's corresponding door keyword."
   [k]
   (keyword "door" (name k)))
 
-
-(defn get-adjacent
-  [{:keys [m] :as input} [x y :as p]]
-  (reduce (fn [r [[x y] c]]
-            (update r c #(conj % [x y])))
-          {}
-          (for [dx [-1 0 1]
-                dy [-1 0 1]
-                :let [nx (+ x dx)
-                      ny (+ y dy)
-                      c (get-in m [ny nx])]
-                :when (and (not (= p [nx ny]))
-                           (some? c)
-                           (not= c :wall))]
-            [[nx ny] c])))
+(defn door->key 
+  [d]
+  (keyword "key" (name d)))
 
 
-(defn merge-doors-and-keys
-  [r adj dist]
-  (reduce (fn [nr [k [p]]]
-            (let [[_ curr-dist] (get nr k)]
-              (if (and (some? curr-dist) (<= curr-dist dist))
-                nr
-                (assoc nr k [p dist]))))
-          r
-          (dissoc adj :wall :space :start)))
+(def up [0 -1])
+(def down [0 1])
+(def right [1 0])
+(def left [-1 0])
 
-#_(explore-from (read-input ex1) [5 1])
-(defn explore-from
-  "Starting at [x y] return a mapping from doors/keys to the coordinate of the
-  door/key and the min number of steps to get there."
-  [input start]
-  (loop [q (conj clojure.lang.PersistentQueue/EMPTY [start 0])
-         visited #{}
-         r {}]
-    (if (empty? q)
-      r
-      (let [[[x y] dist] (peek q) 
-            adj (get-adjacent input [x y])]
-        (recur (into (pop q)
-                     (map #(vector % (inc dist)))
-                     (sets/difference (set (:space adj)) visited))
-               (conj visited [x y])
-               (merge-doors-and-keys r adj (inc dist)))))))
+(defn adjacent
+  [maze [x y ks :as pos]]
+  (reduce (fn [adj [dx dy]]
+            (let [nx (+ x dx)
+                  ny (+ y dy)
+                  c (get-in maze [ny nx])]
+              (cond ; it's a key, pick it up.
+                    (key? c)
+                    (conj adj [nx ny (conj ks c)])
+                    ; it's a door and we have the key.
+                    (and (door? c) (contains? ks (door->key c)))
+                    (conj adj [nx ny ks])
+                    ; it's a space
+                    (#{:start :space} c)
+                    (conj adj [nx ny ks])
+                    ; off the maze, a wall, or a door we don't have the key for 
+                    :else
+                    adj)))
+          #{} 
+          [up down left right]))
 
 
-; this function doesn't help
-(defn find-min-key
-  [r]
-  (transduce (filter (comp (partial = "key") namespace key))
-             (completing
-               (fn [[_ [_ min-dist] :as min-k] [_ [_ dist] :as x]]
-                 (cond (nil? min-k) x
-                       (< dist min-dist) x
-                       :else min-k)))
-             nil
-             r))
-
-
-; greedy algorithm
-; find all keys from given location
-; choose the closest key 
-; remove the door corresponding to the chosen key 
-; move to chosen key location
-; repeat until there are no more keys, record dist
-
-; will this result in the minimum number of ? no -> ex2
-
-
-; brute force
-; build a tree where there is a branch at every choice of keyA
-; tree is rooted at nil key
-; nodes are a key and the state after choosing that key
-; leafs are dist to recover all keys
-; so traversal from root to any leaf will give sequence of choices and cost of
-;   of that sequence
-
-
-; heuristic to choose best possible key?
-
-#_(prn (part-1 (read-input ex1)))
-#_(prn (part-1 (read-input ex2)))
-(defn part-1
-  ([{:keys [start] :as input}]
-   (part-1 input (explore-from input start) 0))
-  ([{:keys [doors] :as input} r total-dist]
-   (if-let [[k [k-coord k-dist]] (find-min-key r)]
-     (let [door-coord (get doors (key->door k))
-           next-input (cond-> (assoc-m input k-coord :space)
-                        (some? door-coord) (assoc-m door-coord :space))]
-       (recur next-input
-              (explore-from next-input k-coord)
-              (+ total-dist k-dist)))
-     total-dist)))
+(deftest test-adjacent
+  (let [{:keys [maze]} (read-input ex1)]
+    (testing "can move to spaces but not walls"
+      (is (= #{[4 1 #{}] [6 1 #{}]} (adjacent maze [5 1 #{}]))))
+    (testing "moving to a cell with a key puts the key in key set"
+      (is (= #{[5 1 #{}] [7 1 #{:key/a}]} (adjacent maze [6 1 #{}]))))
+    (testing "moving to a key which has already been obtained"
+      (is (= #{[5 1 #{:key/a}] [7 1 #{:key/a}]} (adjacent maze [6 1 #{:key/a}]))))
+    (testing "can move to cell with door if key is in key set"
+      (is (= #{[5 1 #{}]} (adjacent maze [4 1 #{}])))
+      (is (= #{[3 1 #{:key/a}] [5 1 #{:key/a}]} (adjacent maze [4 1 #{:key/a}]))))))
 
 
 
-; todo
-
-; 1 redo explore-from to only return keys, their distances, and their coordinates
-; 2 write test for explore-from
-; 3 write fn to build decision tree, probably recursive
-
-
-
+; goal is to find the size of the shortest path from
+; [start-x start-y #{]] to [_ _ every-key-in-maze?] 
+; 
