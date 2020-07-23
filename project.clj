@@ -6,4 +6,5 @@
                  [com.googlecode.lanterna/lanterna "3.0.2"]
                  [instaparse "1.4.10"]]
   :java-source-paths ["src"]
+  :jvm-opts ["-Xmx16g" "-Xms16g"]
   :repl-options {:init-ns advent-of-code-2019.day-01})
