@@ -202,21 +202,21 @@
         visited (HashSet.)
         min-end (volatile! nil)]
     (.add pq {:pos [start-x start-y #{}] :dist 0})
-    (while (not= 0 (.size pq))
+    (while (and (not= 0 (.size pq)) (nil? @min-end))
       (let [{u :pos dist :dist} (.poll pq)]
-        (when (and (has-all-keys? u all-keys)
-                   (< dist (:dist @min-end Long/MAX_VALUE)))
-          (vreset! min-end {:dist dist :pos u}))
-        (doseq [v (adjacent-part1 maze u)]
-          (when (not (.contains visited v))
-            (let [alt (inc dist)
-                  dist-v (get all-dist v Long/MAX_VALUE)]
-              (when (< alt dist-v)
-                (.remove pq {:pos v :dist dist-v})
-                (.add pq {:pos v :dist alt})
-                (.put all-dist v alt)
-                (.put prev v u)))))
-        (.add visited u)))
+        (if (has-all-keys? u all-keys)
+          (vreset! min-end {:dist dist :pos u})
+          (do
+            (doseq [v (adjacent-part1 maze u)]
+              (when (not (.contains visited v))
+                (let [alt (inc dist)
+                      dist-v (get all-dist v Long/MAX_VALUE)]
+                  (when (< alt dist-v)
+                    (.remove pq {:pos v :dist dist-v})
+                    (.add pq {:pos v :dist alt})
+                    (.put all-dist v alt)
+                    (.put prev v u)))))
+            (.add visited u)))))
     (:dist @min-end)))
 
 
@@ -224,11 +224,29 @@
   (is (= 8 (dijkstra-part1 (read-input ex1))))
   (is (= 86 (dijkstra-part1 (read-input ex2))))
   (is (= 132 (dijkstra-part1 (read-input ex3))))
-  (is (= 136 (dijkstra-part1 (read-input ex4))))
+  #_(is (= 136 (dijkstra-part1 (read-input ex4))))
   (is (= 81 (dijkstra-part1 (read-input ex5)))))
 
 
 #_(time (dijkstra-part1 (read-input))) ; ~ 165s, ~ 2:45min, 5406 steps
+
+
+(comment
+  (let [b1 (doto (java.util.BitSet. 26)
+             (.set 25 true)
+             (.set 24 true)
+             (.set 23 true))
+        b2 (doto (java.util.BitSet. 26)
+             (.set 25 true)
+             (.set 24 true)
+             (.set 23 true))
+        b3 (doto (java.util.BitSet. 26)
+             (.set 25 true))]
+    (prn (= b1 b2))
+    (prn (= b2 b3))
+    (prn (= b1 b3)))
+  
+  )
 
 
 ; part 2
@@ -394,10 +412,10 @@
 
 
 (deftest test-dijkstra-part2
-  (is (= 8 (dijkstra-part2 (part2-maze (read-input ex6)))))
-  (is (= 24 (dijkstra-part2 (part2-maze (read-input ex7)))))
-  (is (= 32 (dijkstra-part2 (part2-maze (read-input ex8)))))
-  (is (= 72 (dijkstra-part2 (part2-maze (read-input ex9))))))
+  #_(is (= 8 (dijkstra-part2 (part2-maze (read-input ex6)))))
+  #_(is (= 24 (dijkstra-part2 (part2-maze (read-input ex7)))))
+  #_(is (= 32 (dijkstra-part2 (part2-maze (read-input ex8)))))
+  #_(is (= 72 (dijkstra-part2 (part2-maze (read-input ex9))))))
 
 
 #_(time (dijkstra-part2 (part2-maze (read-input))))

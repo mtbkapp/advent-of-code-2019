@@ -1,0 +1,176 @@
+package advent_of_code_2019;
+
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.PriorityQueue;
+
+
+
+public class day_19 {
+  private static final String ex1 = "#########\n#b.A.@.a#\n#########";
+  private static final String ex2 = "########################\n#f.D.E.e.C.b.A.@.a.B.c.#\n######################.#\n#d.....................#\n########################";
+  private static final String ex3 = "########################\n#...............b.C.D.f#\n#.######################\n#.....@.a.B.c.d.A.e.F.g#\n########################";
+  private static final String ex4 = "#################\n#i.G..c...e..H.p#\n########.########\n#j.A..b...f..D.o#\n########@########\n#k.E..a...g..B.n#\n########.########\n#l.F..d...h..C.m#\n#################";
+  private static final String ex5 = "########################\n#@..............ac.GI.b#\n###d#e#f################\n###A#B#C################\n###g#h#i################\n########################";
+
+  public static void main(String[] args) {
+    //day_19 x = new day_19();
+    //x.parse(ex1);
+  }
+
+  public Cell[][] parse(String input) {
+    String[] lines = input.split("\n");
+    int height = lines.length;
+    int width = lines[0].length();
+    Cell[][] maze = new Cell[height][width];
+    for(int y = 0; y < height; y++) {
+      String line = lines[y];
+      for(int x = 0; x < width; x++) {
+        char c = line.charAt(x);
+        Cell cell = null;
+
+        if (c == '#') {
+          cell = new Cell(CellType.WALL);
+        } else if (c == '.') {
+          cell = new Cell(CellType.SPACE);
+        } else if (c == '@') {
+          cell = new Cell(CellType.START);
+        } else if (Character.isLowerCase(c)) {
+          cell = new Cell(CellType.KEY, c);
+        } else if (Character.isUpperCase(c)) {
+          cell = new Cell(CellType.DOOR, c);
+        } else {
+          throw new IllegalStateException("Invalid cell: " + c);
+        }
+
+        maze[y][x] = cell;
+      }
+    }
+
+    return maze;
+  }
+
+  public enum CellType {
+    WALL,
+    START,
+    SPACE,
+    DOOR,
+    KEY
+  }
+
+
+  public class Cell {
+    public final CellType type;
+    public final char name; 
+
+    Cell(CellType type) {
+      this(type, '-');
+    }
+
+    Cell(CellType type, char name) {
+      this.type = type;
+      this.name = Character.toLowerCase(name);
+    }
+
+    boolean isKey() {
+      return CellType.KEY == this.type;
+    }
+
+    boolean isDoor() {
+      return CellType.DOOR == this.type;
+    }
+
+    boolean isSpace() {
+      return CellType.START == this.type || CellType.SPACE == this.type;
+    }
+  }
+
+
+  public class Vector {
+    public final int x;
+    public final int y;
+
+    Vector(int x, int y) {
+      this.x = x;
+      this.y = y;
+    }
+
+    Vector move(Vector dir) {
+      return new Vector(x + dir.x, y + dir.y);
+    }
+
+    boolean inBounds(int width, int height) {
+      return x >= 0 && x < width && y >= 0 && y < height;
+    }
+  }
+
+
+  public class State {
+    private final Vector[] dirs = new Vector[]{ new Vector(1,0), new Vector(-1, 0), new Vector(0,1), new Vector(0,-1) };
+    public final Cell[][] maze;
+    public final Vector pos;
+    public final BitSet keys;
+    public final byte keyCount;
+    public final byte width;
+    public final byte height;
+    public final int dist;
+
+    State(Cell[][] maze, Vector pos, BitSet keys, byte keyCount, byte width, byte height, int dist) {
+      this.maze = maze;
+      this.pos = pos;
+      this.keys = keys;
+      this.keyCount = keyCount;
+      this.width = width;
+      this.height = height;
+      this.dist = dist;
+    }
+
+    State addKey(char key) {
+      BitSet newKeys = (BitSet) keys.clone();
+      newKeys.set(keyIndex(key));
+      return new State(maze, pos, newKeys, keyCount, width, height, dist);
+    }
+
+    State move(Vector dir) {
+      return new State(maze, pos.move(dir), keys, keyCount, width, height, dist);
+    }
+
+    boolean hasAllKeys() {
+      return keys.cardinality() == keyCount; 
+    }
+
+    boolean haveKey(char name) {
+      return keys.get(keyIndex(name)); 
+    }
+
+    int keyIndex(char key) {
+      return key - 'a';
+    }
+
+    ArrayList<State> adjacent() {
+      ArrayList<State> adj = new ArrayList<>();
+      for (Vector dir : dirs) {
+        Vector newPos = pos.move(dir);
+        if (newPos.inBounds(width, height)) {
+          Cell cell = maze[newPos.y][newPos.x];
+          if (cell.isSpace()) {
+
+          } else if (cell.isDoor() && haveKey(cell.name)) {
+
+          } else if (cell.isKey() && !haveKey(cell.name)) {
+
+          }
+        }
+      }
+
+      return adj;
+    }
+
+    @Override
+    public boolean equals(Object rhs) {
+
+    }
+  }
+}
