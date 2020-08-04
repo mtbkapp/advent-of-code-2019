@@ -56,6 +56,15 @@ public class Node2 implements Node {
     return keys.size();
   }
 
+  public KeySet getKeys() {
+    return keys; 
+  }
+
+  public static Node2 startFromMaze(Maze maze) {
+    Vector[] robots = maze.allStarts().toArray(new Vector[]{});
+    return new Node2(robots, KeySet.empty());
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (obj instanceof Node2) {

@@ -37,6 +37,10 @@ public class Node1 implements Node {
     return keys.contains(cell.symbol); 
   }
 
+  public KeySet getKeys() {
+    return keys;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (obj instanceof Node1) {

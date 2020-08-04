@@ -1,5 +1,6 @@
 package advent_of_code_2019.day18;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,6 +15,8 @@ public class Test {
   public static final String ex4 = "#################\n#i.G..c...e..H.p#\n########.########\n#j.A..b...f..D.o#\n########@########\n#k.E..a...g..B.n#\n########.########\n#l.F..d...h..C.m#\n#################";
   public static final String ex5 = "########################\n#@..............ac.GI.b#\n###d#e#f################\n###A#B#C################\n###g#h#i################\n########################";
   public static final String ex6 = "###############\n#d.ABC.#.....a#\n######@#@######\n###############\n######@#@######\n#b.....#.....c#\n###############";
+  public static final String ex7 = "#############\n#DcBa.#.GhKl#\n#.###@#@#I###\n#e#d#####j#k#\n###C#@#@###J#\n#fEbA.#.FgHi#\n#############";
+  public static final String ex8 = "#############\n#g#f.D#..h#l#\n#F###e#E###.#\n#dCba@#@BcIJ#\n#############\n#nK.L@#@G...#\n#M###N#H###.#\n#o#m..#i#jk.#\n#############";
 
   private static void is(boolean condition) throws Exception {
     if (!condition) {
@@ -114,7 +117,7 @@ public class Test {
 
   private static void testNode2Adjacent() throws Exception {
     Maze maze = Maze.fromString(ex6);
-    Node2 n = new Node2(maze.allStarts().toArray(new Vector[]{}), KeySet.empty());
+    Node2 n = Node2.startFromMaze(maze);
 
     List<Node> adj = n.adjacent(maze);
     is(4 == adj.size());
@@ -153,9 +156,140 @@ public class Test {
     is(0 == adj.get(3).keyCount());
 
 
-    // doors
+    // by door C, but no keys
+    startRobots = new Vector[]{new Vector(6,1), new Vector(8,1), new Vector(6,4), new Vector(8,4)};
+    Node2 start = new Node2(startRobots, KeySet.empty());
+    adj = start.adjacent(maze);
+    is(5 == adj.size());
+    List<HashSet<Vector>> nextRobots = new ArrayList<>();
+    nextRobots.add(new HashSet<>());
+    nextRobots.add(new HashSet<>());
+    nextRobots.add(new HashSet<>());
+    nextRobots.add(new HashSet<>());
+
+    for (Node adjNode : adj) {
+      Node2 n2 = (Node2) adjNode;
+      is(0 == n2.keyCount());
+      int i = 0;
+      for(Vector v : n2.getRobots()) {
+        nextRobots.get(i).add(v);
+        i++;
+      }
+    }
+
+    HashSet<Vector> expected = new HashSet<>();
+    expected.add(new Vector(6, 2));
+    expected.add(new Vector(6, 1)); // robot stays put in most nodes
+    is(expected.equals(nextRobots.get(0)));
+
+    expected.clear();
+    expected.add(new Vector(8,1));
+    expected.add(new Vector(9,1));
+    expected.add(new Vector(8,2));
+    is(expected.equals(nextRobots.get(1)));
+
+    expected.clear();
+    expected.add(new Vector(6,4));
+    expected.add(new Vector(6,5));
+    is(expected.equals(nextRobots.get(2)));
+
+    expected.clear();
+    expected.add(new Vector(8,4));
+    expected.add(new Vector(8,5));
+    is(expected.equals(nextRobots.get(3)));
+  
+    // by door C, with key c 
+    startRobots = new Vector[]{new Vector(6,1), new Vector(8,1), new Vector(6,4), new Vector(8,4)};
+    start = new Node2(startRobots, KeySet.withKeys('c'));
+    adj = start.adjacent(maze);
+    is(6 == adj.size());
+
+    for(HashSet<Vector> nr : nextRobots) {
+      nr.clear();
+    }
+    for (Node adjNode : adj) {
+      Node2 n2 = (Node2) adjNode;
+      is(1 == n2.keyCount());
+      int i = 0;
+      for(Vector v : n2.getRobots()) {
+        nextRobots.get(i).add(v);
+        i++;
+      }
+    }
+
+    expected.clear();
+    expected.add(new Vector(6, 2));
+    expected.add(new Vector(6, 1));
+    expected.add(new Vector(5, 1));
+    is(expected.equals(nextRobots.get(0)));
+
+    expected.clear();
+    expected.add(new Vector(8,1));
+    expected.add(new Vector(9,1));
+    expected.add(new Vector(8,2));
+    is(expected.equals(nextRobots.get(1)));
+
+    expected.clear();
+    expected.add(new Vector(6,4));
+    expected.add(new Vector(6,5));
+    is(expected.equals(nextRobots.get(2)));
+
+    expected.clear();
+    expected.add(new Vector(8,4));
+    expected.add(new Vector(8,5));
+    is(expected.equals(nextRobots.get(3)));
+  
  
-    // keys 
+    // key c already collected, by door C, also by key a
+    startRobots = new Vector[]{new Vector(6,1), new Vector(12,1), new Vector(6,4), new Vector(8,4)};
+    start = new Node2(startRobots, KeySet.withKeys('c'));
+    adj = start.adjacent(maze);
+    is(6 == adj.size());
+    
+    for(HashSet<Vector> nr : nextRobots) {
+      nr.clear();
+    }
+    for (Node adjNode : adj) {
+      Node2 n2 = (Node2) adjNode;
+      boolean keyLoc = false;
+      int i = 0;
+      for(Vector v : n2.getRobots()) {
+        nextRobots.get(i).add(v);
+        i++;
+
+        if(v.equals(new Vector(13,1))) {
+          keyLoc = true;
+        } 
+      }
+
+      if (keyLoc) {
+        is(KeySet.withKeys('c','a').equals(n2.getKeys()));
+      } else {
+        is(KeySet.withKeys('c').equals(n2.getKeys()));
+      }
+    }
+
+    expected.clear();
+    expected.add(new Vector(6, 2));
+    expected.add(new Vector(6, 1));
+    expected.add(new Vector(5, 1));
+    is(expected.equals(nextRobots.get(0)));
+
+    expected.clear();
+    expected.add(new Vector(11,1));
+    expected.add(new Vector(12,1));
+    expected.add(new Vector(13,1));
+    is(expected.equals(nextRobots.get(1)));
+
+    expected.clear();
+    expected.add(new Vector(6,4));
+    expected.add(new Vector(6,5));
+    is(expected.equals(nextRobots.get(2)));
+
+    expected.clear();
+    expected.add(new Vector(8,4));
+    expected.add(new Vector(8,5));
+    is(expected.equals(nextRobots.get(3)));
   }
 
   private static void testNodeAdjacent() throws Exception {
@@ -352,6 +486,18 @@ public class Test {
     });
   }
 
+  public static void testPart2() throws Exception {
+    is(24 == Maze.fromString(ex6).minDistFromAllStarts());
+    is(32 == Maze.fromString(ex7).minDistFromAllStarts());
+
+    prnTime("ex6", () -> {
+      prn(Maze.fromString(ex6).minDistFromAllStarts());
+    });
+    prnTime("ex7", () -> {
+      prn(Maze.fromString(ex7).minDistFromAllStarts());
+    });
+  }
+
   public static void test() {
     try {
       testParsing();
@@ -363,6 +509,7 @@ public class Test {
       testPart1();
       testNode2();
       testParsePart2();
+      testPart2();
     } catch (Exception ex) {
       ex.printStackTrace();
     }

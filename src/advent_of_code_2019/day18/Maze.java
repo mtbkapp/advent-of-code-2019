@@ -48,6 +48,31 @@ public class Maze {
     return starts;
   }
 
+  public void toPart2Maze() {
+    if(allStarts().size() == 1) {
+      Vector start = firstStart();
+
+      // non diagonals to walls
+      cells[start.y][start.x] = new Cell(Cell.CellType.WALL, '#');
+      for(Vector v : start.adjacent()) {
+        cells[v.y][v.x] = new Cell(Cell.CellType.WALL, '#');
+      }
+
+      // diagonals to robots
+      starts.clear();
+      Vector[] diagonals = new Vector[]{
+        new Vector(start.x - 1, start.y - 1),
+        new Vector(start.x - 1, start.y + 1),
+        new Vector(start.x + 1, start.y - 1),
+        new Vector(start.x + 1, start.y + 1)
+      };
+      for(Vector v : diagonals) {
+        cells[v.y][v.x] = new Cell(Cell.CellType.START, '@');
+        starts.add(v);
+      }
+    }
+  }
+
   @Override
   public String toString() {
     StringBuffer buff = new StringBuffer();
@@ -117,6 +142,10 @@ public class Maze {
 
   public int minDistToAllKeysSingleStart() {
     return minDistToAllKeys(new Node1(firstStart(), KeySet.empty()));
+  }
+
+  public int minDistFromAllStarts() {
+    return minDistToAllKeys(Node2.startFromMaze(this));
   }
 
   public int minDistToAllKeys(Node start) {

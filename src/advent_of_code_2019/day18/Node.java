@@ -7,4 +7,5 @@ import java.util.Objects;
 public interface Node {
   public int keyCount();
   public List<Node> adjacent(Maze maze); 
+  public KeySet getKeys();
 }
